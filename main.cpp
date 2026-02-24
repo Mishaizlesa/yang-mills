@@ -104,8 +104,8 @@ int main(int argc, char *argv[])
     {
         State y = {0}, y_new = {0};
         double t = 0.0;
-        double t_end = 35.0 + 1e-7;
-        double h = 1e-10;
+        double t_end = 6.9696938208964516193 * 4 + 1e-2;
+        double h = 0x1.p-10;
         long long step = 0;
         bool near_zero = false;
 
@@ -117,6 +117,7 @@ int main(int argc, char *argv[])
 
         y.data[0] = x0; y.data[1] = y0;
         y.data[2] = px0; y.data[3] = py0;
+        y.data[1] = 1.0/abs(y.data[0]);
 
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
@@ -151,18 +152,18 @@ int main(int argc, char *argv[])
             double E_new = compute_energy(&y_new);
             double delta_E = fabs(E_new - E0);
 
-            if (delta_E > 1e-13) {
+            if (delta_E > 0x1.p-48) {
                 h *= step_factor_inv;
                 continue;
             }
-            else if (delta_E < 1e-17 && !near_zero) {
+            else if (delta_E < 0x1.p-51 && !near_zero) {
                 h *= step_factor;
                 continue;
             }
 
             E0 = E_new;
 
-            if (step % 100 == 0 && step > 0) {
+            if (step % 10 == 0 && step > 0) {
                 fprintf(fp, "%.15e %.15e %.15e %.15e %.15e %.16e\n",
                     t, y.data[0], y.data[1], y.data[2], y.data[3], E_new);
             }
@@ -170,17 +171,16 @@ int main(int argc, char *argv[])
             bool crossed_y  = (y.data[1] * y_new.data[1] <= 0.0) && t > 1e-10;
             bool crossed_px = (y.data[2] * y_new.data[2] <= 0.0) && t > 1e-10;
 
-            if (crossed_y || crossed_px)
+            if (crossed_y)
             {
-                if ((crossed_y  && fabs(y_new.data[1]) > 1e-100) ||
-                    (crossed_px && fabs(y_new.data[2]) > 1e-100))
+                if (fabs(y_new.data[1]) > 1e-100)
                 {
                     near_zero = true;
                     h *= step_factor_inv;
                     continue;
                 }
 
-                const char *event = crossed_y ? "y=0" : "px=0";
+                const char *event = "y=0";
 
                 printf("\n[%2d] === Пересечение %s ===\n", cas, event);
                 printf("   t ≈ %.19f\n", t + h);
@@ -194,7 +194,44 @@ int main(int argc, char *argv[])
                 for (int r = 0; r < 4; r++) {
                     printf("   [ ");
                     for (int c = 0; c < 4; c++) {
-                        printf("%12.6e", y.data[4 + c*4 + r]);
+                        printf("%12.15e", y.data[4 + c*4 + r]);
+                        if (c < 3) printf(", ");
+                    }
+                    printf("]");
+                    if (r < 3) printf(",\n");
+                    else printf("\n");
+                }
+
+                fprintf(fp, "%.15e %.15e %.15e %.15e %.15e %.16e\n",
+                        t + h, y_new.data[0], y_new.data[1], y_new.data[2], y_new.data[3], E_new);
+
+                near_zero = false;
+            }
+
+            if (crossed_px)
+            {
+                if (fabs(y_new.data[2]) > 1e-100)
+                {
+                    near_zero = true;
+                    h *= step_factor_inv;
+                    continue;
+                }
+
+                const char *event = "px=0";
+
+                printf("\n[%2d] === Пересечение %s ===\n", cas, event);
+                printf("   t ≈ %.19f\n", t + h);
+                printf("   x  = %.19f\n", y_new.data[0]);
+                printf("   y  = %.19f\n", y_new.data[1]);
+                printf("   px = %.19f\n", y_new.data[2]);
+                printf("   py = %.19f\n", y_new.data[3]);
+                printf("   E  = %.19e   ΔE = %.2e\n", E_new, delta_E);
+
+                printf("   Монодромия:\n");
+                for (int r = 0; r < 4; r++) {
+                    printf("   [ ");
+                    for (int c = 0; c < 4; c++) {
+                        printf("%12.15e", y.data[4 + c*4 + r]);
                         if (c < 3) printf(", ");
                     }
                     printf("]");
